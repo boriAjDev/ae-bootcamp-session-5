@@ -9,6 +9,9 @@ test.describe('TODO Application - Core Journeys', () => {
   let todoPage;
 
   test.beforeEach(async ({ page }) => {
+    // Reset backend state before each test
+    await page.request.post('http://localhost:3001/api/todos/reset');
+    
     todoPage = new TodoPage(page);
     await todoPage.navigate();
     // Wait for initial load to complete
@@ -227,32 +230,46 @@ test.describe('TODO Application - Core Journeys', () => {
       await expect(editButton).toBeVisible();
     });
 
-    test('should trigger edit action when edit button clicked', async ({ page }) => {
-      const todoTitle = 'Task to edit';
+    test('should edit and save a todo title', async () => {
+      const originalTitle = 'Original task';
+      const newTitle = 'Updated task';
+      
+      await todoPage.createTodo(originalTitle);
+      
+      // Verify original exists
+      expect(await todoPage.todoExists(originalTitle)).toBe(true);
+      
+      // Edit the todo
+      await todoPage.editTodo(originalTitle, newTitle);
+      
+      // Verify the title was updated
+      expect(await todoPage.todoExists(newTitle)).toBe(true);
+      expect(await todoPage.todoExists(originalTitle)).toBe(false);
+    });
+
+    test('should cancel editing without saving changes', async () => {
+      const todoTitle = 'Task to not edit';
       
       await todoPage.createTodo(todoTitle);
       
-      // Set up console listener to verify edit is attempted
-      const consoleLogs = [];
-      page.on('console', msg => consoleLogs.push(msg.text()));
-      
+      // Start editing and then cancel
       await todoPage.clickEditTodo(todoTitle);
       
-      // NOTE: This will show "Edit not implemented" in console
-      // Wait a moment for console message
-      await page.waitForTimeout(100);
+      // Verify edit input is visible
+      const editInput = todoPage.getEditInput();
+      await expect(editInput).toBeVisible();
       
-      // Verify edit was attempted (via console log)
-      const editAttempted = consoleLogs.some(log => 
-        log.includes('Edit not implemented')
-      );
-      expect(editAttempted).toBe(true);
-    });
-
-    // Additional edit tests would be added once edit functionality is implemented
-    test.skip('should update todo title when edited', async () => {
-      // This test is skipped as edit functionality is not yet implemented
-      // Will be implemented in future iterations
+      // Modify the input but cancel
+      await editInput.clear();
+      await editInput.fill('This should not be saved');
+      await todoPage.getCancelButton().click();
+      
+      // Wait for edit mode to close
+      await todoPage.page.waitForTimeout(100);
+      
+      // Verify original title is still there
+      expect(await todoPage.todoExists(todoTitle)).toBe(true);
+      expect(await todoPage.todoExists('This should not be saved')).toBe(false);
     });
   });
 
@@ -297,14 +314,47 @@ test.describe('TODO Application - Core Journeys', () => {
     });
   });
 
+  test.describe('Statistics Display', () => {
+    test('should display correct count of incomplete items', async () => {
+      // Create mixed todos
+      await todoPage.createTodo('Buy groceries');
+      await todoPage.createTodo('Walk the dog');
+      await todoPage.createTodo('Finish report');
+      
+      // Toggle one to completed
+      await todoPage.toggleTodo('Finish report');
+      
+      // Check stats
+      const stats = await todoPage.getStatistics();
+      expect(stats.itemsLeft).toContain('2 items left');
+      expect(stats.completed).toContain('1 completed');
+    });
+
+    test('should update stats after toggling todos', async () => {
+      await todoPage.createTodo('Task 1');
+      await todoPage.createTodo('Task 2');
+      
+      // Initially all incomplete
+      let stats = await todoPage.getStatistics();
+      expect(stats.itemsLeft).toContain('2 items left');
+      expect(stats.completed).toContain('0 completed');
+      
+      // Toggle one
+      await todoPage.toggleTodo('Task 1');
+      
+      // Stats should update
+      stats = await todoPage.getStatistics();
+      expect(stats.itemsLeft).toContain('1 items left');
+      expect(stats.completed).toContain('1 completed');
+    });
+  });
+
   test.describe('Empty State', () => {
     test('should handle empty todo list gracefully', async () => {
-      // When no todos exist
+      // When no todos exist, empty state message should display
       const hasEmpty = await todoPage.hasEmptyState();
       expect(hasEmpty).toBe(true);
       
-      // NOTE: The app doesn't show an empty state message
-      // This is identified as a UX issue
       const count = await todoPage.getTodoCount();
       expect(count).toBe(0);
     });
@@ -337,7 +387,7 @@ test.describe('TODO Application - Core Journeys', () => {
   });
 
   test.describe('Error State Handling', () => {
-    test('should handle API errors gracefully during fetch', async ({ page, context }) => {
+    test('should display error message when fetching todos fails', async ({ page, context }) => {
       // Intercept API calls and simulate error
       await context.route('**/api/todos', route => {
         if (route.request().method() === 'GET') {
@@ -353,8 +403,11 @@ test.describe('TODO Application - Core Journeys', () => {
       // Wait for loading to complete
       await page.waitForTimeout(1000);
       
-      // App should handle this gracefully (though it may not currently)
-      // At minimum, loading should stop
+      // App should display error message
+      const hasError = await errorTodoPage.hasErrorMessage();
+      expect(hasError).toBe(true);
+      
+      // Loading should stop
       const isLoading = await errorTodoPage.isLoading();
       expect(isLoading).toBe(false);
     });

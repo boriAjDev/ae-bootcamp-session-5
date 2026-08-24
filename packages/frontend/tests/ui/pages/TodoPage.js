@@ -28,8 +28,10 @@ class TodoPage {
   async createTodo(title) {
     await this.todoInput.fill(title);
     await this.addButton.click();
-    // Wait for the request to complete by checking that input is cleared
-    await this.page.waitForTimeout(100); // Small delay for mutation
+    // Wait for the todo to actually appear in the list (confirms mutation completed and query refetched)
+    await this.getTodoByTitle(title).waitFor({ state: 'visible', timeout: 5000 });
+    // Small additional wait for UI to fully update
+    await this.page.waitForTimeout(100);
   }
 
   /**
@@ -95,6 +97,69 @@ class TodoPage {
   async clickEditTodo(title) {
     const editButton = this.getTodoEditButton(title);
     await editButton.click();
+    // Wait for edit input to appear after clicking edit
+    await this.page.getByRole('textbox').first().waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Get the edit input field (visible when editing a todo)
+   * @returns {import('@playwright/test').Locator} The edit input field
+   */
+  getEditInput() {
+    // Find the edit textbox (second textbox, first is the "Add todo" input)
+    return this.page.getByRole('textbox').nth(1);
+  }
+
+  /**
+   * Get the save button (visible when editing a todo)
+   * @returns {import('@playwright/test').Locator} The save button
+   */
+  getSaveButton() {
+    return this.page.getByRole('button', { name: /save/i });
+  }
+
+  /**
+   * Get the cancel button (visible when editing a todo)
+   * @returns {import('@playwright/test').Locator} The cancel button
+   */
+  getCancelButton() {
+    return this.page.getByRole('button', { name: /cancel/i });
+  }
+
+  /**
+   * Edit a todo by clicking edit, changing the title, and saving
+   * @param {string} oldTitle - The current title of the todo
+   * @param {string} newTitle - The new title to set
+   */
+  async editTodo(oldTitle, newTitle) {
+    // Click edit button
+    const editButton = this.getTodoEditButton(oldTitle);
+    await editButton.click();
+    
+    // Wait for and find the edit input (it appears inside the list item being edited)
+    const input = this.getEditInput();
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    
+    await input.clear();
+    await input.fill(newTitle);
+    await this.getSaveButton().click();
+    await this.page.waitForTimeout(100); // Wait for mutation
+  }
+
+  /**
+   * Start editing a todo but cancel the operation
+   * @param {string} title - The title of the todo
+   */
+  async cancelEdit(title) {
+    const editButton = this.getTodoEditButton(title);
+    await editButton.click();
+    
+    // Wait for edit input to appear
+    const input = this.getEditInput();
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    
+    await this.getCancelButton().click();
+    await this.page.waitForTimeout(100);
   }
 
   /**
@@ -187,20 +252,17 @@ class TodoPage {
    * @returns {Promise<{itemsLeft: string, completed: string}>} Statistics
    */
   async getStatistics() {
-    const chips = this.page.getByRole('status'); // MUI Chips have status role
-    const count = await chips.count();
+    // Look for chips by their text pattern
+    const itemsLeftChip = this.page.locator('text=/\\d+ items left/i');
+    const completedChip = this.page.locator('text=/\\d+ completed/i');
+    
+    // Wait for stats chips to be visible (they appear after todos are loaded)
+    await itemsLeftChip.waitFor({ state: 'visible', timeout: 5000 });
     
     const stats = {
-      itemsLeft: '',
-      completed: ''
+      itemsLeft: await itemsLeftChip.textContent(),
+      completed: await completedChip.textContent()
     };
-
-    if (count >= 1) {
-      stats.itemsLeft = await chips.nth(0).textContent();
-    }
-    if (count >= 2) {
-      stats.completed = await chips.nth(1).textContent();
-    }
 
     return stats;
   }
@@ -210,9 +272,28 @@ class TodoPage {
    * @returns {Promise<boolean>} True if visible
    */
   async hasEmptyState() {
-    // The app doesn't implement empty state, but we can check for no todos
-    const count = await this.getTodoCount();
-    return count === 0;
+    // Check for the empty state message
+    const emptyMessage = this.page.locator('text=/no todos yet/i');
+    try {
+      await emptyMessage.waitFor({ state: 'visible', timeout: 1000 });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Check if an error message is displayed
+   * @returns {Promise<boolean>} True if error is visible
+   */
+  async hasErrorMessage() {
+    const errorMessage = this.page.locator('text=/failed to load todos/i');
+    try {
+      await errorMessage.waitFor({ state: 'visible', timeout: 2000 });
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }
 

@@ -93,6 +93,16 @@ app.delete('/api/todos/:id', (req, res) => {
   res.json({ message: 'Todo deleted' });
 });
 
+// POST /api/todos/reset - Reset todos (for testing)
+// Only available in non-production environments
+if (process.env.NODE_ENV !== 'production') {
+  app.post('/api/todos/reset', (req, res) => {
+    todos = [];
+    nextId = 1;
+    res.json({ message: 'Todos reset successfully' });
+  });
+}
+
 // INTENTIONAL ISSUE: Missing error handling middleware
 
 module.exports = app;
