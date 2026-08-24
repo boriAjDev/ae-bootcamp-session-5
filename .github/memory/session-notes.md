@@ -39,3 +39,17 @@ This file documents completed development sessions for future reference. Add a c
   - All endpoints return 404 when resource not found
   - Intentionally preserved ESLint warnings (unused variable, console.log) for Step 5-2
 - **Outcomes:** All 15 backend tests pass. Documented 6 new patterns in patterns-discovered.md covering REST API validation, 404 handling, toggle logic, delete operations, and incremental TDD workflow.
+
+---
+
+### Session: Step 5-2 - ESLint Error Resolution
+
+- **Date:** 2026-08-24
+- **What was accomplished:** Systematically resolved all ESLint errors in backend and frontend code. Backend had 2 lint issues (unused variable and console statement), frontend was already clean.
+- **Key findings and decisions:**
+  - Removed unused `unusedDebugFlag` variable from app.js (no-unused-vars violation)
+  - Removed console.log from index.js server startup (no-console violation)
+  - Frontend had zero lint errors (already compliant)
+  - Verified all tests still pass after lint fixes (15 backend + 1 frontend)
+  - Established clean baseline for integration and UI testing workflows
+- **Outcomes:** Zero ESLint errors across entire workspace. All tests passing. Codebase ready for Step 5-3 integration and UI testing phase.

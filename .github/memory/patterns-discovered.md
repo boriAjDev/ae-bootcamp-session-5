@@ -149,3 +149,31 @@ Use this file to accumulate reusable code patterns, technical decisions, and les
   ```
 
 - **Related files:** [`packages/backend/__tests__/app.test.js`](../../packages/backend/__tests__/app.test.js)
+
+---
+
+### Code Quality: Systematic Lint Error Resolution
+
+- **Context:** Resolving ESLint errors across a codebase after implementing features.
+- **Problem:** Fixing lint errors randomly can miss related issues and make it hard to verify the impact of changes.
+- **Solution:** Run lint to identify all errors, categorize by type (unused variables, console statements, style issues), fix similar issues together in one pass, then verify tests still pass. This ensures no functionality is broken while improving code quality.
+- **Example:**
+
+  ```bash
+  # Identify errors by category
+  npm run lint
+  
+  # Fix unused variables
+  # Remove or use unused imports/variables
+  
+  # Fix console statements
+  # Remove console.log or replace with proper logging
+  
+  # Verify tests after fixes
+  npm test
+  
+  # Confirm zero lint errors
+  npm run lint
+  ```
+
+- **Related files:** [`packages/backend/src/app.js`](../../packages/backend/src/app.js), [`packages/backend/src/index.js`](../../packages/backend/src/index.js)
